@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attendance Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        header {
+            background: linear-gradient(135deg, #173b66 0%, #0f2442 100%);
+            color: white;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        header p {
+            margin: 6px 0 0;
+            color: #94a3b8;
+            font-size: 15px;
+        }
+
+        .db-badge {
+            display: inline-block;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #cbd5e1;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .actions-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+
+        .btn-primary-attendance {
+            background: #2563eb;
+            color: white;
+            font-size: 15px;
+            padding: 13px 22px;
+        }
+
+        .btn-register {
+            background: #173b66;
+            color: white;
+        }
+
+        .btn-students {
+            background: #059669;
+            color: white;
+        }
+
+        .btn-logs {
+            background: #4f46e5;
+            color: white;
+        }
+
+        .btn-capture {
+            background: #d97706;
+            color: white;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 16px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+            border-top: 4px solid #173b66;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+        }
+
+        .card h3 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card .number {
+            font-size: 36px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .card.present { border-top-color: #059669; }
+        .card.present .number { color: #059669; }
+
+        .card.absent { border-top-color: #dc2626; }
+        .card.absent .number { color: #dc2626; }
+
+        .card.rate { border-top-color: #2563eb; }
+        .card.rate .number { color: #2563eb; }
+
+        .info-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.05);
+        }
+
+        .info-card h3 {
+            margin-top: 0;
+            color: #173b66;
+        }
+
+        .info-card ol {
+            padding-left: 20px;
+            line-height: 1.8;
+            color: #334155;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Smart Attendance Management System</h1>
+        <p>AI-Powered Face Attendance & Student Verification</p>
+        <div class="db-badge">
+            ⚡ Status: {{ stats.db_status }}
+        </div>
+    </header>
+
+    <main>
+        <div class="actions-bar">
+            <a href="/mark-attendance" class="btn btn-primary-attendance">
+                📸 Mark Attendance Now
+            </a>
+            <a href="/register" class="btn btn-register">
+                ➕ Register New Student
+            </a>
+            <a href="/students" class="btn btn-students">
+                👥 View Registered Students
+            </a>
+            <a href="/attendance" class="btn btn-logs">
+                📋 Attendance Logs
+            </a>
+            <a href="/capture-face" class="btn btn-capture">
+                📷 Update Student Photo
+            </a>
+        </div>
+
+        <h2 class="section-title">Today's Overview</h2>
+        <div class="cards">
+            <div class="card">
+                <h3>Total Students</h3>
+                <div class="number">{{ stats.total_students }}</div>
+            </div>
+
+            <div class="card present">
+                <h3>Present Today</h3>
+                <div class="number">{{ stats.present_today }}</div>
+            </div>
+
+            <div class="card absent">
+                <h3>Absent Today</h3>
+                <div class="number">{{ stats.absent_today }}</div>
+            </div>
+
+            <div class="card rate">
+                <h3>Attendance Rate</h3>
+                <div class="number">{{ stats.attendance_rate }}%</div>
+            </div>
+        </div>
+
+        <div class="info-card">
+            <h3>How AI Face Attendance Works</h3>
+            <ol>
+                <li><strong>Student Registration:</strong> Register a student with their Roll Number, Name, Class, and take/upload their face photo. The photo is compressed and saved in the database in <strong>Base64</strong> format.</li>
+                <li><strong>Live Face Matching:</strong> When marking attendance, the webcam captures the student's live face in real-time.</li>
+                <li><strong>Open-Source AI Verification:</strong> The live face is matched against stored Base64 images using the open-source <strong>DeepFace (Facenet)</strong> model.</li>
+                <li><strong>Automatic Attendance:</strong> Once verified, attendance is recorded with exact timestamp and confidence score. Duplicate entries on the same day are automatically prevented.</li>
+            </ol>
+        </div>
+    </main>
+</body>
+</html>

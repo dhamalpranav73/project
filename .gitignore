@@ -1,0 +1,40 @@
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+atlas-credentials.env
+
+# Database files
+*.db
+*.db-journal
+attendance_local.db
+
+# Local face data
+/captured_face_test.jpg
+/face_data/
+
+# Node & Next.js
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+.next/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

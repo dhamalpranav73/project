@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Pulse radar effect for camera face guide */
+@keyframes pulseRadar {
+  0% {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.97);
+    opacity: 0.85;
+  }
+}
+
+.radar-scan {
+  animation: pulseRadar 2s ease-in-out infinite;
+}
+
+/* Auto-scanner laser beam animation */
+@keyframes scanBeam {
+  0% {
+    top: 6%;
+    opacity: 0.3;
+  }
+  50% {
+    top: 88%;
+    opacity: 0.9;
+  }
+  100% {
+    top: 6%;
+    opacity: 0.3;
+  }
+}
+
+.scan-beam {
+  animation: scanBeam 2s ease-in-out infinite;
+}

@@ -1,0 +1,30 @@
+services:
+  # 1. Python Flask AI Backend
+  - type: web
+    name: smart-attendance-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn --chdir app app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: MONGODB_URI
+        sync: false
+      - key: APP_SECRET_KEY
+        generateValue: true
+
+  # 2. Next.js Frontend
+  - type: web
+    name: smart-attendance-frontend
+    runtime: node
+    plan: free
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.12.0
+      - key: NEXT_PUBLIC_API_URL
+        sync: false

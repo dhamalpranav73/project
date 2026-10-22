@@ -1,0 +1,29 @@
+name: Keep Render Services Alive 24/7
+
+on:
+  schedule:
+    # Runs every 10 minutes (Render spins down after 15 min of inactivity)
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend & Frontend
+        env:
+          # In your GitHub Repo -> Settings -> Secrets and variables -> Actions:
+          # Set RENDER_BACKEND_URL to your backend URL (e.g. https://your-backend.onrender.com)
+          # Set RENDER_FRONTEND_URL to your frontend URL (e.g. https://your-frontend.onrender.com)
+          BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL || 'https://smart-attendance-backend.onrender.com' }}
+          FRONTEND_URL: ${{ secrets.RENDER_FRONTEND_URL || 'https://smart-attendance-frontend.onrender.com' }}
+        run: |
+          echo "=== Pinging Render Services to Keep Free Instances Awake ==="
+          
+          echo "Pinging Backend Health Endpoint..."
+          curl -s -o /dev/null -w "Backend Status: %{http_code} (in %{time_total}s)\n" "$BACKEND_URL/healthz" || echo "Backend ping attempted"
+          
+          echo "Pinging Frontend Endpoint..."
+          curl -s -o /dev/null -w "Frontend Status: %{http_code} (in %{time_total}s)\n" "$FRONTEND_URL" || echo "Frontend ping attempted"
+          
+          echo "Keep-alive ping completed successfully!"

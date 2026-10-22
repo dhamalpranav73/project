@@ -1,0 +1,12 @@
+Flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=21.2.0
+pymongo[srv]>=4.6.0
+dnspython>=2.4.0
+python-dotenv>=1.0.0
+certifi>=2024.2.2
+deepface>=0.0.90
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+werkzeug>=3.0.0
+requests>=2.31.0

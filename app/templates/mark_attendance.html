@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance - AI Face Recognition</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 30px 15px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: #173b66;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        h1 {
+            color: #173b66;
+            margin: 0 0 6px;
+            font-size: 26px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .roll-filter-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .roll-filter-box label {
+            font-weight: 600;
+            font-size: 14px;
+            color: #334155;
+            white-space: nowrap;
+        }
+
+        .roll-filter-box input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .camera-card {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-wrapper {
+            position: relative;
+            max-width: 480px;
+            height: 360px;
+            margin: 0 auto;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        /* Face Guide Overlay Box */
+        .face-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 250px;
+            border: 2px dashed rgba(255, 255, 255, 0.7);
+            border-radius: 120px;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+            display: none;
+        }
+
+        .face-guide::after {
+            content: "Align Face Here";
+            position: absolute;
+            bottom: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 2px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 18px;
+        }
+
+        .btn {
+            padding: 12px 22px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-start {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-capture {
+            background: #059669;
+            color: white;
+        }
+
+        .btn-opencv {
+            background: #475569;
+            color: white;
+        }
+
+        .fallback-row {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        /* Loading Spinner */
+        .loading-state {
+            display: none;
+            margin: 20px 0;
+            text-align: center;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 4px solid #cbd5e1;
+            border-top: 4px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Result Cards */
+        .result-card {
+            display: none;
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-success {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            color: #14532d;
+        }
+
+        .result-warning {
+            background: #fffbeb;
+            border: 2px solid #fde68a;
+            color: #92400e;
+        }
+
+        .result-error {
+            background: #fef2f2;
+            border: 2px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .student-result-flex {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .student-thumb {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 2px solid #166534;
+        }
+
+        .details-list {
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            background: #166534;
+            color: white;
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+        <h1>Mark Attendance</h1>
+        <p class="subtitle">
+            Look at the camera and capture your face. Open-source AI will verify your image against the database and record your attendance.
+        </p>
+
+        <!-- Optional Roll Number targeting -->
+        <div class="roll-filter-box">
+            <label for="targetRoll">Target Roll Number (Optional):</label>
+            <input type="text" id="targetRoll" placeholder="Leave empty for auto-detect, or enter roll (e.g. MCA001)">
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-card">
+            <div class="video-wrapper">
+                <span id="camPlaceholder" style="color:#94a3b8; font-size: 14px; padding: 20px;">
+                    Click "Start Camera" below to begin face verification
+                </span>
+                <video id="webcam" autoplay playsinline style="display:none;"></video>
+                <div class="face-guide" id="faceGuide"></div>
+            </div>
+
+            <canvas id="snapshotCanvas" style="display:none;"></canvas>
+
+            <div class="controls">
+                <button type="button" class="btn btn-start" id="startCamBtn">▶ Start Camera</button>
+                <button type="button" class="btn btn-capture" id="captureBtn" style="display:none;">📸 Mark Attendance Now</button>
+                <button type="button" class="btn btn-opencv" id="openCvBtn">💻 OpenCV Camera</button>
+            </div>
+
+            <div class="fallback-row">
+                Or upload live snapshot photo:
+                <input type="file" id="fileUpload" accept="image/*" style="margin-left:8px; color:#cbd5e1;">
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading-state" id="loadingState">
+            <div class="spinner"></div>
+            <div style="font-weight:600; color:#1e293b;" id="loadingText">Analyzing live face with DeepFace AI...</div>
+            <div style="font-size:13px; color:#64748b; margin-top:4px;">Matching against database records</div>
+        </div>
+
+        <!-- Result Alert Box -->
+        <div class="result-card" id="resultCard">
+            <div id="resultContent"></div>
+        </div>
+
+        <p style="text-align: center; margin-top: 25px;">
+            <a href="/attendance" style="color: #173b66; font-weight: 600; text-decoration: none;">
+                📋 View Full Attendance Log Table →
+            </a>
+        </p>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('snapshotCanvas');
+        const placeholder = document.getElementById('camPlaceholder');
+        const faceGuide = document.getElementById('faceGuide');
+        const startBtn = document.getElementById('startCamBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const openCvBtn = document.getElementById('openCvBtn');
+        const fileUpload = document.getElementById('fileUpload');
+        const targetRoll = document.getElementById('targetRoll');
+        const loadingState = document.getElementById('loadingState');
+        const resultCard = document.getElementById('resultCard');
+        const resultContent = document.getElementById('resultContent');
+
+        let stream = null;
+
+        // 1. Start Browser Webcam
+        startBtn.addEventListener('click', async () => {
+            hideResult();
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                faceGuide.style.display = 'block';
+                placeholder.style.display = 'none';
+                startBtn.style.display = 'none';
+                captureBtn.style.display = 'inline-flex';
+            } catch (err) {
+                alert("Camera access denied or unavailable: " + err.message + "\nYou can use the OpenCV Camera button or file upload.");
+            }
+        });
+
+        // 2. Capture Snapshot & Send to Backend for AI Match
+        captureBtn.addEventListener('click', () => {
+            if (!video.videoWidth) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const liveBase64 = canvas.toDataURL('image/jpeg', 0.88);
+            sendForVerification(liveBase64);
+        });
+
+        // 3. File Upload Alternative
+        fileUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                sendForVerification(event.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 4. OpenCV Camera Trigger
+        openCvBtn.addEventListener('click', async () => {
+            hideResult();
+            openCvBtn.disabled = true;
+            openCvBtn.textContent = "Capturing OpenCV Frame...";
+            try {
+                const res = await fetch('/api/capture-webcam', { method: 'POST' });
+                const data = await res.json();
+                if (data.success && data.image_base64) {
+                    sendForVerification(data.image_base64);
+                } else {
+                    showError("Could not capture frame from OpenCV: " + (data.error || "Unknown"));
+                }
+            } catch (err) {
+                showError("Error connecting to server camera: " + err.message);
+            } finally {
+                openCvBtn.disabled = false;
+                openCvBtn.textContent = "💻 OpenCV Camera";
+            }
+        });
+
+        // 5. Send Live Image to Flask Face Verification API
+        async function sendForVerification(liveImageBase64) {
+            hideResult();
+            showLoading(true);
+
+            try {
+                const payload = {
+                    image_base64: liveImageBase64,
+                    roll_number: targetRoll.value.trim()
+                };
+
+                const response = await fetch('/api/mark-attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                showLoading(false);
+
+                if (!response.ok) {
+                    showError(data.message || "Failed to process attendance request.");
+                    return;
+                }
+
+                if (data.matched) {
+                    if (data.success) {
+                        showSuccess(data);
+                    } else {
+                        showAlreadyMarked(data);
+                    }
+                } else {
+                    showNoMatch(data.message);
+                }
+            } catch (err) {
+                showLoading(false);
+                showError("Communication error with server: " + err.message);
+            }
+        }
+
+        function showLoading(show) {
+            loadingState.style.display = show ? 'block' : 'none';
+            if (show) {
+                captureBtn.disabled = true;
+            } else {
+                captureBtn.disabled = false;
+            }
+        }
+
+        function hideResult() {
+            resultCard.style.display = 'none';
+            resultCard.className = 'result-card';
+        }
+
+        function showSuccess(data) {
+            resultCard.className = 'result-card result-success';
+            const student = data.student || {};
+            const record = data.record || {};
+            const distInfo = data.distance !== null ? `<br><small style="color:#15803d;">DeepFace Distance: ${data.distance} (Verified Match)</small>` : '';
+
+            resultContent.innerHTML = `
+                <span class="status-badge">✅ PRESENT</span>
+                <h3 style="margin:4px 0 8px; color:#14532d;">${data.message}</h3>
+                <div class="student-result-flex">
+                    ${student.image_base64 ? `<img src="${student.image_base64}" class="student-thumb" alt="Database Photo">` : ''}
+                    <div class="details-list">
+                        <strong>Student:</strong> ${student.name || 'N/A'}<br>
+                        <strong>Roll Number:</strong> ${student.roll_number || 'N/A'}<br>
+                        <strong>Class:</strong> ${student.class_name || 'N/A'}<br>
+                        <strong>Date & Time:</strong> ${record.date || ''} at ${record.time || ''}
+                        ${distInfo}
+                    </div>
+                </div>
+            `;
+            resultCard.style.display = 'block';
+        }
+
+        function showAlreadyMarked(data) {
+            resultCard.className = 'result-card result-warning';
+            const student = data.student || {};
+            const record = data.record || {};
+
+            resultContent.innerHTML = `
+                <span class="status-badge" style="background:#b45309;">⚠️ ALREADY MARKED</span>
+                <h3 style="margin:4px 0 8px; color:#92400e;">${data.message}</h3>
+                <div class="student-result-flex">
+                    ${student.image_base64 ? `<img src="${student.image_base64}" class="student-thumb" style="border-color:#b45309;" alt="Database Photo">` : ''}
+                    <div class="details-list">
+                        <strong>Student:</strong> ${student.name}<br>
+                        <strong>Roll Number:</strong> ${student.roll_number}<br>
+                        <strong>Status:</strong> Present today (${record.time || 'Recorded'})
+                    </div>
+                </div>
+            `;
+            resultCard.style.display = 'block';
+        }
+
+        function showNoMatch(msg) {
+            resultCard.className = 'result-card result-error';
+            resultContent.innerHTML = `
+                <h3 style="margin:0 0 6px; color:#991b1b;">❌ Face Not Recognized</h3>
+                <p style="margin:0; font-size:14px;">${msg}</p>
+                <p style="margin:8px 0 0; font-size:13px; color:#7f1d1d;">
+                    Please ensure good lighting and look straight into the camera. If you have not registered yet, please <a href="/register" style="color:#991b1b; font-weight:bold;">Register Here</a>.
+                </p>
+            `;
+            resultCard.style.display = 'block';
+        }
+
+        function showError(msg) {
+            resultCard.className = 'result-card result-error';
+            resultContent.innerHTML = `
+                <h3 style="margin:0 0 6px; color:#991b1b;">Error</h3>
+                <p style="margin:0; font-size:14px;">${msg}</p>
+            `;
+            resultCard.style.display = 'block';
+        }
+        // Auto release camera when tab is hidden or navigated away
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && stream) {
+                stream.getTracks().forEach(t => t.stop());
+                video.style.display = 'none';
+                startBtn.style.display = 'inline-flex';
+                captureBtn.style.display = 'none';
+                faceGuide.style.display = 'none';
+                placeholder.style.display = 'block';
+                placeholder.textContent = 'Camera paused (click Start Camera to resume)';
+            }
+        });
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+        });
+    </script>
+</body>
+</html>

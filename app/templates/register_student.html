@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Student - Smart Attendance AI</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 30px 15px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 650px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 14px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            color: #173b66;
+            margin-top: 0;
+            font-size: 24px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #173b66;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        .camera-section {
+            margin: 22px 0;
+            padding: 18px;
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .video-container {
+            position: relative;
+            max-width: 380px;
+            margin: 12px auto;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            min-height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video, canvas {
+            width: 100%;
+            max-width: 380px;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .camera-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .btn-cam {
+            padding: 9px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-start {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-snap {
+            background: #059669;
+            color: white;
+        }
+
+        .btn-retake {
+            background: #dc2626;
+            color: white;
+        }
+
+        .btn-server-cam {
+            background: #4b5563;
+            color: white;
+        }
+
+        .upload-divider {
+            margin: 15px 0 10px;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .preview-box {
+            display: none;
+            margin: 10px auto;
+            max-width: 200px;
+            border: 3px solid #059669;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .preview-box img {
+            width: 100%;
+            display: block;
+        }
+
+        .submit-btn {
+            margin-top: 25px;
+            padding: 14px;
+            width: 100%;
+            background: #173b66;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .submit-btn:hover {
+            background: #0f2442;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background: #dcfce7;
+            color: #166534;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+        <h1>Register New Student</h1>
+        <p style="color: #64748b; font-size: 14px; margin-top: -6px;">
+            Fill in student details and capture/upload face image. The image will be stored as Base64 in the database for AI matching.
+        </p>
+
+        {% if error %}
+            <div class="alert-error">
+                <strong>Error:</strong> {{ error }}
+            </div>
+        {% endif %}
+
+        {% if saved %}
+            <div class="alert-success">
+                <strong>Success!</strong> Student registered and face photo saved in database as Base64.
+                {% if student %}
+                    <br><strong>Roll:</strong> {{ student.roll_number }} | <strong>Name:</strong> {{ student.name }} | <strong>Class:</strong> {{ student.class_name }}
+                {% endif %}
+                <p style="margin: 8px 0 0;">
+                    <a href="/students" style="color: #166534; font-weight: bold;">View in Student List →</a>
+                    or <a href="/mark-attendance" style="color: #166534; font-weight: bold; margin-left: 10px;">Test Attendance →</a>
+                </p>
+            </div>
+        {% endif %}
+
+        <form method="POST" id="registerForm">
+            <div class="form-group">
+                <label for="roll">Roll Number *</label>
+                <input type="text" id="roll" name="roll_number" placeholder="e.g. MCA001" required>
+            </div>
+
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="student_name" placeholder="e.g. Pranav Dhamal" required>
+            </div>
+
+            <div class="form-group">
+                <label for="class">Class / Department *</label>
+                <input type="text" id="class" name="class_name" placeholder="e.g. MCA Final Year" required>
+            </div>
+
+            <!-- Face Photo Capture Section -->
+            <div class="camera-section">
+                <label style="font-size: 15px; margin-bottom: 8px;">📷 Student Face Photo (Stored as Base64 in Database)</label>
+                
+                <div class="video-container" id="videoBox">
+                    <span id="camPlaceholder" style="color:#94a3b8; font-size: 13px;">Click "Start Camera" to enable webcam</span>
+                    <video id="webcam" autoplay playsinline style="display:none;"></video>
+                </div>
+
+                <canvas id="snapshotCanvas" style="display:none;"></canvas>
+
+                <div class="preview-box" id="previewBox">
+                    <img id="previewImg" src="" alt="Captured Face Preview">
+                </div>
+
+                <div class="camera-controls">
+                    <button type="button" class="btn-cam btn-start" id="startCamBtn">▶ Start Camera</button>
+                    <button type="button" class="btn-cam btn-snap" id="snapBtn" style="display:none;">📸 Capture Photo</button>
+                    <button type="button" class="btn-cam btn-retake" id="retakeBtn" style="display:none;">↺ Retake</button>
+                    <button type="button" class="btn-cam btn-server-cam" id="serverCamBtn">💻 Use OpenCV Camera</button>
+                </div>
+
+                <div class="upload-divider">— OR UPLOAD PHOTO FILE —</div>
+                <input type="file" id="fileInput" accept="image/*" style="font-size: 13px;">
+
+                <!-- Hidden field for Base64 payload -->
+                <input type="hidden" name="image_base64" id="imageBase64">
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">Register Student & Store Face in Database</button>
+        </form>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('snapshotCanvas');
+        const placeholder = document.getElementById('camPlaceholder');
+        const previewBox = document.getElementById('previewBox');
+        const previewImg = document.getElementById('previewImg');
+        const imageBase64Input = document.getElementById('imageBase64');
+        const startBtn = document.getElementById('startCamBtn');
+        const snapBtn = document.getElementById('snapBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const serverCamBtn = document.getElementById('serverCamBtn');
+        const fileInput = document.getElementById('fileInput');
+
+        let stream = null;
+
+        // Start Webcam
+        startBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+                startBtn.style.display = 'none';
+                snapBtn.style.display = 'inline-block';
+            } catch (err) {
+                alert("Could not access webcam: " + err.message + "\nYou can also upload an image file or use the OpenCV Camera button.");
+            }
+        });
+
+        // Capture Snapshot from Video
+        snapBtn.addEventListener('click', () => {
+            if (!video.videoWidth) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const base64Data = canvas.toDataURL('image/jpeg', 0.88);
+            setCapturedImage(base64Data);
+
+            // Stop webcam stream
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none';
+            }
+            snapBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-block';
+        });
+
+        // Retake Photo
+        retakeBtn.addEventListener('click', () => {
+            previewBox.style.display = 'none';
+            imageBase64Input.value = '';
+            retakeBtn.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            placeholder.style.display = 'block';
+            video.style.display = 'none';
+        });
+
+        // File Upload Handler
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setCapturedImage(event.target.result);
+                retakeBtn.style.display = 'inline-block';
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    video.style.display = 'none';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Server-Side OpenCV Camera Trigger
+        serverCamBtn.addEventListener('click', async () => {
+            serverCamBtn.disabled = true;
+            serverCamBtn.textContent = "Opening OpenCV Camera...";
+            try {
+                const res = await fetch('/api/capture-webcam', { method: 'POST' });
+                const data = await res.json();
+                if (data.success && data.image_base64) {
+                    setCapturedImage(data.image_base64);
+                    retakeBtn.style.display = 'inline-block';
+                    placeholder.style.display = 'none';
+                } else {
+                    alert("OpenCV capture failed: " + (data.error || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Failed to communicate with OpenCV camera: " + err.message);
+            } finally {
+                serverCamBtn.disabled = false;
+                serverCamBtn.textContent = "💻 Use OpenCV Camera";
+            }
+        });
+
+        function setCapturedImage(base64Data) {
+            imageBase64Input.value = base64Data;
+            previewImg.src = base64Data;
+            previewBox.style.display = 'block';
+            placeholder.style.display = 'none';
+        }
+
+        // Form Validation before submit
+        document.getElementById('registerForm').addEventListener('submit', (e) => {
+            if (!imageBase64Input.value) {
+                e.preventDefault();
+                alert("Please take a photo or upload an image before registering.");
+            }
+        });
+        // Auto release camera when tab is hidden or navigated away
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && stream) {
+                stream.getTracks().forEach(t => t.stop());
+                video.style.display = 'none';
+                startBtn.style.display = 'inline-block';
+                snapBtn.style.display = 'none';
+                placeholder.style.display = 'block';
+                placeholder.textContent = 'Camera paused (click Start Camera to resume)';
+            }
+        });
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+        });
+    </script>
+</body>
+</html>

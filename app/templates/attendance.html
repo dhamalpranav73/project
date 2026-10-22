@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Records - Smart Attendance AI</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f4f8;
+            margin: 0;
+            padding: 30px 15px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 980px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+        }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #193b65;
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .back-link {
+            color: #193b65;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn-mark {
+            background: #2563eb;
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .filter-bar {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter-bar label {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .filter-bar input[type="date"] {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn-filter {
+            background: #173b66;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-reset {
+            color: #64748b;
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #193b65;
+            color: white;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .status-present {
+            display: inline-block;
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <div>
+                <a href="/" class="back-link">← Back to Dashboard</a>
+                <h1 style="margin-top: 8px;">Student Attendance Records</h1>
+            </div>
+            <div>
+                <a href="/mark-attendance" class="btn-mark">📸 Mark Attendance</a>
+            </div>
+        </div>
+
+        <form method="GET" class="filter-bar">
+            <label for="dateFilter">Filter by Date:</label>
+            <input type="date" id="dateFilter" name="date" value="{{ selected_date or '' }}">
+            <button type="submit" class="btn-filter">Filter</button>
+            {% if selected_date %}
+                <a href="/attendance" class="btn-reset">Clear Filter</a>
+            {% endif %}
+        </form>
+
+        {% if records %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Roll Number</th>
+                    <th>Student Name</th>
+                    <th>Class</th>
+                    <th>Status</th>
+                    <th>AI Match Distance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in records %}
+                <tr>
+                    <td><strong>{{ r.date }}</strong></td>
+                    <td>{{ r.time }}</td>
+                    <td><strong>{{ r.roll_number }}</strong></td>
+                    <td>{{ r.name }}</td>
+                    <td>{{ r.class_name }}</td>
+                    <td>
+                        <span class="status-present">✓ Present</span>
+                    </td>
+                    <td style="font-size: 13px; color: #475569;">
+                        {% if r.confidence is not none %}
+                            {{ r.confidence }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding: 25px 0; color: #64748b; text-align: center;">
+            No attendance records found{% if selected_date %} for {{ selected_date }}{% endif %}.
+            <br><a href="/mark-attendance" style="color: #2563eb; font-weight: 600; display: inline-block; margin-top: 8px;">Mark attendance now →</a>
+        </p>
+        {% endif %}
+    </div>
+</body>
+</html>

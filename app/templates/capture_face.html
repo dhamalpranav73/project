@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capture / Update Student Face</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #f0f4f8;
+            margin: 0;
+            padding: 30px 15px;
+            color: #1e293b;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+        }
+
+        h1 {
+            color: #193b65;
+            margin-top: 0;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 11px;
+            margin-top: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        button.btn-submit {
+            background: #173b66;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            margin-top: 20px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            width: 100%;
+        }
+
+        .error {
+            color: #b42318;
+            background: #fee4e2;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .success {
+            color: #166534;
+            background: #dcfce7;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .video-box {
+            position: relative;
+            max-width: 360px;
+            height: 270px;
+            margin: 15px auto;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        video, canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .cam-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 10px 0;
+        }
+
+        .btn-cam {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-start { background: #2563eb; color: white; }
+        .btn-snap { background: #059669; color: white; }
+        .btn-retake { background: #dc2626; color: white; }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <p><a href="/" style="color: #173b66; text-decoration: none; font-weight: 600;">← Back to Dashboard</a></p>
+        <h1>Capture / Update Student Face</h1>
+
+        <p style="color: #64748b; font-size: 14px;">
+            Enter the registered student's roll number and capture/upload their face. The photo will be saved to the database in Base64 format.
+        </p>
+
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+
+        {% if saved %}
+            <p class="success">
+                Face photo captured and updated in database successfully!
+            </p>
+        {% endif %}
+
+        {% if student %}
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                <h3 style="margin-top: 0; color: #173b66;">Student Found</h3>
+                <p style="margin: 4px 0;"><strong>Roll Number:</strong> {{ student.roll_number }}</p>
+                <p style="margin: 4px 0;"><strong>Name:</strong> {{ student.name }}</p>
+                <p style="margin: 4px 0;"><strong>Class:</strong> {{ student.class_name }}</p>
+                {% if student.image_base64 %}
+                    <p style="margin: 8px 0 0;">
+                        <strong>Current Stored Photo:</strong><br>
+                        <img src="{{ student.image_base64 }}" style="width: 80px; height: 80px; border-radius: 8px; object-fit: cover; border: 2px solid #cbd5e1; margin-top: 6px;">
+                    </p>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <form method="POST" id="captureForm">
+            <label for="roll_number">Student Roll Number</label>
+            <input
+                type="text"
+                id="roll_number"
+                name="roll_number"
+                value="{{ student.roll_number if student else '' }}"
+                placeholder="e.g. MCA001"
+                required
+            >
+
+            <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center;">
+                <label style="margin-top: 0; font-size: 14px;">📷 Web Camera Capture</label>
+
+                <div class="video-box">
+                    <span id="camPlaceholder" style="color: #94a3b8; font-size: 13px;">Click "Start Camera" to capture</span>
+                    <video id="webcam" autoplay playsinline style="display:none;"></video>
+                </div>
+                <canvas id="snapshotCanvas" style="display:none;"></canvas>
+
+                <div class="cam-controls">
+                    <button type="button" class="btn-cam btn-start" id="startCamBtn">▶ Start Camera</button>
+                    <button type="button" class="btn-cam btn-snap" id="snapBtn" style="display:none;">📸 Take Photo</button>
+                    <button type="button" class="btn-cam btn-retake" id="retakeBtn" style="display:none;">↺ Retake</button>
+                </div>
+
+                <div style="margin: 12px 0 6px; font-size: 13px; color: #64748b;">— OR UPLOAD PHOTO FILE —</div>
+                <input type="file" id="fileInput" accept="image/*" style="font-size: 13px;">
+
+                <input type="hidden" name="image_base64" id="imageBase64">
+            </div>
+
+            <button type="submit" class="btn-submit">Save Face to Database</button>
+        </form>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('snapshotCanvas');
+        const placeholder = document.getElementById('camPlaceholder');
+        const startBtn = document.getElementById('startCamBtn');
+        const snapBtn = document.getElementById('snapBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const fileInput = document.getElementById('fileInput');
+        const imageBase64 = document.getElementById('imageBase64');
+
+        let stream = null;
+
+        startBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+                startBtn.style.display = 'none';
+                snapBtn.style.display = 'inline-block';
+            } catch (err) {
+                alert("Could not access webcam: " + err.message + "\nYou can also upload a photo file.");
+            }
+        });
+
+        snapBtn.addEventListener('click', () => {
+            if (!video.videoWidth) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const b64 = canvas.toDataURL('image/jpeg', 0.88);
+            imageBase64.value = b64;
+
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                video.style.display = 'none';
+            }
+            snapBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-block';
+            placeholder.textContent = "Photo captured ready to save!";
+            placeholder.style.display = 'block';
+        });
+
+        retakeBtn.addEventListener('click', () => {
+            imageBase64.value = '';
+            retakeBtn.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            placeholder.textContent = "Click Start Camera to capture";
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                imageBase64.value = event.target.result;
+                placeholder.textContent = "File loaded: " + file.name;
+                placeholder.style.display = 'block';
+                if (stream) {
+                    stream.getTracks().forEach(t => t.stop());
+                    video.style.display = 'none';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    </script>
+</body>
+</html>

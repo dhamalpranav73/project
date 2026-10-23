@@ -235,12 +235,29 @@ export default function MarkAttendancePage() {
     if (!isManual && cooldown > 0) return;
 
     // Check geofence restriction if enabled
-    if (campusConfig?.enabled && !isWithinGeofence && distanceToCampus !== null) {
-      setScanStatus(`Geofence restriction: ${distanceToCampus}m away (Max: 100m)`);
-      if (isManual) {
-        alert(`Geofence restriction: You are ${distanceToCampus}m away from campus. Attendance can only be marked within ${campusConfig.radius_meters}m.`);
+    if (campusConfig?.enabled) {
+      if (!userLocation) {
+        setScanStatus("Acquiring GPS location... Please allow location in your browser.");
+        if (isManual) {
+          alert("GPS location is required. Please allow location permissions in your browser.");
+          requestGPSLocation();
+        }
+        return;
       }
-      return;
+      if (!isWithinGeofence && distanceToCampus !== null) {
+        setScanStatus(`Geofence restriction: ${distanceToCampus}m away from campus (Max: ${campusConfig.radius_meters}m)`);
+        setResult({
+          success: false,
+          matched: false,
+          geofence_passed: false,
+          distance_meters: distanceToCampus,
+          message: `Geofence Restriction: You are ${distanceToCampus}m away from the campus/classroom. Attendance can only be marked within ${campusConfig.radius_meters}m.`
+        });
+        if (isManual) {
+          alert(`Geofence restriction: You are ${distanceToCampus}m away from campus. Attendance can only be marked within ${campusConfig.radius_meters}m.`);
+        }
+        return;
+      }
     }
 
     const video = videoRef.current;
@@ -277,6 +294,15 @@ export default function MarkAttendancePage() {
       });
 
       const data = await res.json();
+
+      // If geofence failed on backend
+      if (data.geofence_passed === false || res.status === 403) {
+        setResult(data);
+        setFaceDetected(false);
+        setScanStatus(data.message || "Geofence restriction: Outside campus range.");
+        setCooldown(4); // Pause auto-scan so it doesn't loop when out of range
+        return;
+      }
 
       if (data.face_detected) {
         setFaceDetected(true);
@@ -361,6 +387,15 @@ export default function MarkAttendancePage() {
           })
         });
         const data = await res.json();
+
+      // If geofence failed on backend
+      if (data.geofence_passed === false || res.status === 403) {
+        setResult(data);
+        setFaceDetected(false);
+        setScanStatus(data.message || "Geofence restriction: Outside campus range.");
+        setCooldown(4); // Pause auto-scan so it doesn't loop when out of range
+        return;
+      }
         setResult(data);
         if (data.matched && data.success) playSuccessChime();
       } catch (err: any) {
@@ -380,6 +415,7 @@ export default function MarkAttendancePage() {
     try {
       const res = await fetch(`${API_BASE}/api/capture-webcam`, { method: "POST" });
       const data = await res.json();
+
       if (data.success && data.image_base64) {
         setLastCapturedImage(data.image_base64);
         const matchRes = await fetch(`${API_BASE}/api/attendance/mark`, {
@@ -807,9 +843,27 @@ export default function MarkAttendancePage() {
                 <h2 className="text-sm font-bold text-rose-900">Attendance Not Marked</h2>
                 <p className="text-xs text-rose-800">{result.message}</p>
                 {result.geofence_passed === false && (
-                  <p className="text-[11px] text-rose-700 font-semibold pt-1">
-                    ⚠️ You must be within 100 meters of the classroom/campus. Please move closer to the campus or ask admin to calibrate the location.
-                  </p>
+                  <div className="pt-2 space-y-2">
+                    <p className="text-[11px] text-rose-700 font-semibold">
+                      ⚠️ You are currently outside the allowed 100m classroom geofence.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={handleSetCurrentAsCampus}
+                        disabled={settingLocation}
+                        className="text-xs font-bold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        <span>{settingLocation ? "Setting..." : "Set Current Location as Campus"}</span>
+                      </button>
+                      <Link
+                        href="/settings"
+                        className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition"
+                      >
+                        Adjust Geofence in Settings →
+                      </Link>
+                    </div>
+                  </div>
                 )}
                 <div className="pt-2 flex items-center gap-3">
                   <Link href="/students/register" className="text-xs font-bold text-rose-700 underline hover:text-rose-900">

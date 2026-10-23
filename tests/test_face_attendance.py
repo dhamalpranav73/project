@@ -82,8 +82,11 @@ def run_tests():
         data=json.dumps({"image_base64": b64_mca001, "roll_number": test_roll}),
         content_type="application/json"
     )
-    assert res_nogps.status_code == 403, f"Expected 403 without GPS, got {res_nogps.status_code}"
-    print("[PASS] Attendance correctly blocked when GPS location is not provided (403)")
+    assert res_nogps.status_code == 200, f"Expected 200, got {res_nogps.status_code}"
+    nogps_data = res_nogps.get_json()
+    assert nogps_data["geofence_passed"] is False, "Geofence should be False when GPS is missing"
+    assert nogps_data["success"] is False
+    print("[PASS] Attendance correctly blocked when GPS location is not provided (geofence_passed: False)")
 
     # 6. Test Geofence: Reject when student is > 100m away (e.g., 50km away)
     print("\nTesting Geofence Rejection when student is > 100m away...")
@@ -97,9 +100,10 @@ def run_tests():
         }),
         content_type="application/json"
     )
-    assert res_outside.status_code == 403, f"Expected 403 outside geofence, got {res_outside.status_code}"
+    assert res_outside.status_code == 200, f"Expected 200, got {res_outside.status_code}"
     outside_json = res_outside.get_json()
     assert outside_json["geofence_passed"] is False
+    assert outside_json["success"] is False
     print(f"[PASS] Attendance blocked when student is outside 100m geofence: {outside_json['message']}")
 
     # 7. Test Face Recognition & Geofence: Pass when within 100m (e.g. 5m away)

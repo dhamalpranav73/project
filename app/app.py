@@ -33,7 +33,11 @@ from face_recognition import (
 )
 
 app = Flask(__name__, template_folder="templates")
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {
+    "origins": "*",
+    "allow_headers": ["Content-Type", "Authorization", "x-access-token"],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+}})
 
 
 def check_auth_header():
@@ -366,7 +370,7 @@ def api_mark_attendance_face():
                 "matched": False,
                 "geofence_passed": False,
                 "message": "GPS location is required. You must enable location access to verify you are within 100m of the campus."
-            }), 403
+            }), 200
 
         distance_from_campus = calculate_haversine_distance(
             student_lat, student_lon,
@@ -381,7 +385,7 @@ def api_mark_attendance_face():
                 "distance_meters": distance_from_campus,
                 "allowed_radius": allowed_radius,
                 "message": f"Geofence Restriction: You are {int(distance_from_campus)}m away from the campus/classroom. Attendance can only be marked within {int(allowed_radius)}m."
-            }), 403
+            }), 200
 
     students = get_all_students()
     if not students:

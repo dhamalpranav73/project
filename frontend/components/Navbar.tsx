@@ -6,16 +6,14 @@ import { useState, useEffect } from "react";
 import { 
   Camera, 
   Users, 
-  UserPlus, 
   ClipboardList, 
   LayoutDashboard, 
-  Database,
-  Menu,
-  X,
-  Settings,
-  ShieldCheck,
-  LogOut,
-  LogIn
+  Menu, 
+  X, 
+  Settings, 
+  ShieldCheck, 
+  LogOut, 
+  LogIn 
 } from "lucide-react";
 import { API_BASE, getAdminToken, removeAdminToken, verifyAdminSession } from "@/lib/api";
 
@@ -48,9 +46,7 @@ export default function Navbar() {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Mark Attendance", href: "/attendance/mark", icon: Camera, highlight: true },
     { name: "Students", href: "/students", icon: Users },
-    { name: "Register", href: "/students/register", icon: UserPlus },
     { name: "Logs", href: "/attendance", icon: ClipboardList },
-    { name: "Database", href: "/diagnostics", icon: Database },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
 

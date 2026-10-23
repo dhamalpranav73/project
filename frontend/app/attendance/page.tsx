@@ -22,12 +22,14 @@ import {
   deleteAttendanceRecord, 
   submitManualAttendance, 
   getAdminToken, 
+  verifyAdminSession,
   API_BASE 
 } from "@/lib/api";
 
 export default function AttendanceLogsPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [dateFilter, setDateFilter] = useState("");
   const [rollFilter, setRollFilter] = useState("");
   const [manualModalOpen, setManualModalOpen] = useState(false);
@@ -46,6 +48,14 @@ export default function AttendanceLogsPage() {
     const timer = setTimeout(loadAttendance, 250);
     return () => clearTimeout(timer);
   }, [dateFilter, rollFilter]);
+
+  // Check admin privileges
+  useEffect(() => {
+    const token = getAdminToken();
+    if (token) {
+      verifyAdminSession(token).then((valid) => setIsAdmin(valid));
+    }
+  }, []);
 
   // Export to CSV
   const exportToCSV = () => {
@@ -150,13 +160,15 @@ export default function AttendanceLogsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setManualModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition"
-          >
-            <PlusCircle className="w-3.5 h-3.5 text-blue-600" />
-            Manual Entry
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setManualModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 shadow-xs transition"
+            >
+              <PlusCircle className="w-3.5 h-3.5 text-blue-600" />
+              Manual Entry
+            </button>
+          )}
 
           <button
             onClick={exportToCSV}
@@ -238,7 +250,7 @@ export default function AttendanceLogsPage() {
                   <th className="py-3.5 px-4">Campus Dist</th>
                   <th className="py-3.5 px-4">Verification</th>
                   <th className="py-3.5 px-4">AI Distance</th>
-                  <th className="py-3.5 px-4 text-right">Delete</th>
+                  {isAdmin && <th className="py-3.5 px-4 text-right">Delete</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -297,17 +309,19 @@ export default function AttendanceLogsPage() {
                       {r.confidence !== null && r.confidence !== undefined ? r.confidence : "—"}
                     </td>
 
-                    <td className="py-3 px-4 text-right">
-                      {r.id !== undefined && r.id !== null && (
-                        <button
-                          onClick={() => handleDelete(r.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"
-                          title="Delete entry"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
+                    {isAdmin && (
+                      <td className="py-3 px-4 text-right">
+                        {r.id !== undefined && r.id !== null && (
+                          <button
+                            onClick={() => handleDelete(r.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"
+                            title="Delete entry"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

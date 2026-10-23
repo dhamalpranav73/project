@@ -14,11 +14,12 @@ import {
   RefreshCw,
   Filter
 } from "lucide-react";
-import { fetchStudents, Student, deleteStudent, getAdminToken, API_BASE } from "@/lib/api";
+import { fetchStudents, Student, deleteStudent, getAdminToken, verifyAdminSession, API_BASE } from "@/lib/api";
 
 export default function StudentsDirectoryPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [deletingRoll, setDeletingRoll] = useState<string | null>(null);
@@ -29,6 +30,13 @@ export default function StudentsDirectoryPage() {
     setStudents(data);
     setLoading(false);
   };
+
+  useEffect(() => {
+    const token = getAdminToken();
+    if (token) {
+      verifyAdminSession(token).then((valid) => setIsAdmin(valid));
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -78,13 +86,22 @@ export default function StudentsDirectoryPage() {
           </p>
         </div>
 
-        <Link
-          href="/students/register"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 transition self-start sm:self-auto"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add Student
-        </Link>
+        {isAdmin ? (
+          <Link
+            href="/students/register"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 transition self-start sm:self-auto"
+          >
+            <UserPlus className="w-4 h-4" />
+            Add Student
+          </Link>
+        ) : (
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border border-slate-200 transition self-start sm:self-auto"
+          >
+            Admin Login
+          </Link>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -199,14 +216,16 @@ export default function StudentsDirectoryPage() {
                         >
                           <Camera className="w-4 h-4" />
                         </Link>
-                        <button
-                          onClick={() => handleDelete(student.roll_number, student.name)}
-                          disabled={deletingRoll === student.roll_number}
-                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition disabled:opacity-50"
-                          title="Delete student"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(student.roll_number, student.name)}
+                            disabled={deletingRoll === student.roll_number}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition disabled:opacity-50"
+                            title="Delete student"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

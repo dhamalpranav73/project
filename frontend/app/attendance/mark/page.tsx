@@ -9,22 +9,17 @@ import {
   AlertCircle, 
   Clock, 
   Sparkles, 
-  User, 
   ArrowLeft, 
-  Upload, 
-  Cpu, 
   AlertTriangle, 
   RefreshCw, 
   MapPin, 
-  Navigation, 
   ShieldCheck, 
-  Compass,
-  Zap,
-  ZapOff,
-  Scan,
-  Volume2
+  Zap, 
+  ZapOff, 
+  Scan, 
+  Volume2 
 } from "lucide-react";
-import { API_BASE, fetchCampusLocation, updateCampusLocation, CampusLocation } from "@/lib/api";
+import { API_BASE, fetchCampusLocation, CampusLocation } from "@/lib/api";
 
 function calculateClientDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000.0;
@@ -65,7 +60,6 @@ function playSuccessChime() {
 export default function MarkAttendancePage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isScanningRef = useRef<boolean>(false);
 
@@ -74,7 +68,6 @@ export default function MarkAttendancePage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [result, setResult] = useState<any | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [rollFilter, setRollFilter] = useState("");
   const [lastCapturedImage, setLastCapturedImage] = useState<string | null>(null);
 
   // Auto-Detect & Auto-Marking State
@@ -87,7 +80,6 @@ export default function MarkAttendancePage() {
   const [campusConfig, setCampusConfig] = useState<CampusLocation | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [settingLocation, setSettingLocation] = useState(false);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -164,31 +156,6 @@ export default function MarkAttendancePage() {
     const loc = await fetchCampusLocation();
     if (loc) {
       setCampusConfig(loc);
-    }
-  };
-
-  // Set Current User GPS Location as Campus Center Point
-  const handleSetCurrentAsCampus = async () => {
-    if (!userLocation) {
-      requestGPSLocation();
-      alert("Fetching your current location... Please allow location access in your browser.");
-      return;
-    }
-
-    setSettingLocation(true);
-    const updated = await updateCampusLocation(
-      userLocation.lat,
-      userLocation.lon,
-      100.0,
-      "College Campus / Classroom",
-      true
-    );
-    setSettingLocation(false);
-    if (updated) {
-      setCampusConfig(updated);
-      alert(`Campus location successfully set to your current coordinates! Geofence set to 100m radius.`);
-    } else {
-      alert("Failed to update campus location.");
     }
   };
 
@@ -311,7 +278,7 @@ export default function MarkAttendancePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           image_base64: base64Image,
-          roll_number: rollFilter.trim(),
+          roll_number: "",
           latitude: userLocation?.lat ?? null,
           longitude: userLocation?.lon ?? null
         })
@@ -368,7 +335,7 @@ export default function MarkAttendancePage() {
       isScanningRef.current = false;
       if (isManual) setLoading(false);
     }
-  }, [cooldown, campusConfig, isWithinGeofence, distanceToCampus, rollFilter, userLocation]);
+  }, [cooldown, campusConfig, isWithinGeofence, distanceToCampus, userLocation]);
 
   // Continuous auto-scan loop (every 1200ms)
   useEffect(() => {
@@ -389,82 +356,6 @@ export default function MarkAttendancePage() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
-
-  // Upload photo handler
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      setLastCapturedImage(base64);
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE}/api/attendance/mark`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image_base64: base64,
-            roll_number: rollFilter.trim(),
-            latitude: userLocation?.lat ?? null,
-            longitude: userLocation?.lon ?? null
-          })
-        });
-        const data = await safeParseResponse(res);
-
-      // If geofence failed on backend
-      if (data.geofence_passed === false || res.status === 403) {
-        setResult(data);
-        setFaceDetected(false);
-        setScanStatus(data.message || "Geofence restriction: Outside campus range.");
-        setCooldown(4); // Pause auto-scan so it doesn't loop when out of range
-        return;
-      }
-        setResult(data);
-        if (data.matched && data.success) playSuccessChime();
-      } catch (err: any) {
-        setResult({ success: false, matched: false, message: err.message });
-      } finally {
-        setLoading(false);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // OpenCV server webcam trigger
-  const triggerOpenCVCamera = async () => {
-    stopCamera();
-    setLoading(true);
-    setStatusMessage("Triggering OpenCV camera...");
-    try {
-      const res = await fetch(`${API_BASE}/api/capture-webcam`, { method: "POST" });
-      const data = await res.json();
-
-      if (data.success && data.image_base64) {
-        setLastCapturedImage(data.image_base64);
-        const matchRes = await fetch(`${API_BASE}/api/attendance/mark`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image_base64: data.image_base64,
-            roll_number: rollFilter.trim(),
-            latitude: userLocation?.lat ?? null,
-            longitude: userLocation?.lon ?? null
-          })
-        });
-        const matchData = await safeParseResponse(matchRes);
-        setResult(matchData);
-        if (matchData.matched && matchData.success) playSuccessChime();
-      } else {
-        alert("OpenCV Capture failed: " + (data.error || "Webcam could not be opened."));
-      }
-    } catch (err: any) {
-      alert("Failed to communicate with server: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn pb-12">
@@ -525,16 +416,6 @@ export default function MarkAttendancePage() {
               </p>
             </div>
           </div>
-
-          <button
-            onClick={handleSetCurrentAsCampus}
-            disabled={settingLocation}
-            className="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition border border-slate-200 flex items-center gap-1.5 shrink-0 cursor-pointer"
-            title="Sets your current GPS coordinates as the campus center point"
-          >
-            <Navigation className="w-3.5 h-3.5 text-blue-600" />
-            {settingLocation ? "Setting..." : "Set Current Location as Campus"}
-          </button>
         </div>
 
         {/* Auto-Detect Mode Toggle Banner */}
@@ -591,37 +472,10 @@ export default function MarkAttendancePage() {
                 <RefreshCw className="w-3.5 h-3.5" />
                 Retry Camera
               </button>
-              {typeof window !== "undefined" && (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) && (
-                <button
-                  type="button"
-                  onClick={triggerOpenCVCamera}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                  <Cpu className="w-3.5 h-3.5" />
-                  Use OpenCV Camera
-                </button>
-              )}
             </div>
           </div>
         </div>
       )}
-
-      {/* Target Roll Number Filter (Optional) */}
-      <div className="max-w-md mx-auto bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3">
-        <User className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
-        <input
-          type="text"
-          value={rollFilter}
-          onChange={(e) => setRollFilter(e.target.value)}
-          placeholder="Filter by Roll (Optional: matches all registered if blank)"
-          className="w-full text-xs sm:text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400"
-        />
-        {rollFilter && (
-          <button onClick={() => setRollFilter("")} className="text-xs text-slate-400 hover:text-slate-600 font-bold px-1.5">
-            ✕
-          </button>
-        )}
-      </div>
 
       {/* Live Camera Viewport */}
       <div className="relative max-w-xl mx-auto bg-slate-950 rounded-3xl overflow-hidden shadow-2xl border-2 border-slate-800">
@@ -733,35 +587,12 @@ export default function MarkAttendancePage() {
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Controls Bar */}
-        <div className="p-4 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {typeof window !== "undefined" && (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) && (
-              <button
-                onClick={triggerOpenCVCamera}
-                disabled={loading}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border border-slate-700 cursor-pointer"
-                title="Capture from desktop OpenCV camera"
-              >
-                <Cpu className="w-3.5 h-3.5 text-slate-400" />
-                OpenCV Cam
-              </button>
-            )}
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border border-slate-700 cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5 text-slate-400" />
-              Upload Image
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
+              <span className={`w-2 h-2 rounded-full ${streamActive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+              {streamActive ? "Webcam Active (Hands-Free)" : "Webcam Paused"}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -772,7 +603,7 @@ export default function MarkAttendancePage() {
                 className="px-5 py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-600/30 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 <Camera className="w-4 h-4" />
-                Capture Manually
+                Capture Now
               </button>
             ) : (
               <button
@@ -872,26 +703,13 @@ export default function MarkAttendancePage() {
                 <h2 className="text-sm font-bold text-rose-900">Attendance Not Marked</h2>
                 <p className="text-xs text-rose-800">{result.message}</p>
                 {result.geofence_passed === false && (
-                  <div className="pt-2 space-y-2">
+                  <div className="pt-2 space-y-1.5">
                     <p className="text-[11px] text-rose-700 font-semibold">
-                      ⚠️ You are currently outside the allowed 100m classroom geofence.
+                      ⚠️ Attendance is restricted to within 100m of the college campus or classroom.
                     </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={handleSetCurrentAsCampus}
-                        disabled={settingLocation}
-                        className="text-xs font-bold px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>{settingLocation ? "Setting..." : "Set Current Location as Campus"}</span>
-                      </button>
-                      <Link
-                        href="/settings"
-                        className="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg transition"
-                      >
-                        Adjust Geofence in Settings →
-                      </Link>
-                    </div>
+                    <p className="text-[11px] text-rose-600">
+                      Please ensure your device GPS is enabled and you are physically present on campus.
+                    </p>
                   </div>
                 )}
                 <div className="pt-2 flex items-center gap-3">

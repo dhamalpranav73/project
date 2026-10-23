@@ -121,6 +121,7 @@ export async function fetchStudents(search = "", className = ""): Promise<Studen
     if (search) params.append("search", search);
     if (className) params.append("class_name", className);
     const res = await fetch(`${API_BASE}/api/students?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) return [];
     const data = await res.json();
     return data.students || [];
   } catch (err) {
@@ -136,6 +137,7 @@ export async function fetchAttendance(date = "", roll = "", className = ""): Pro
     if (roll) params.append("roll_number", roll);
     if (className) params.append("class_name", className);
     const res = await fetch(`${API_BASE}/api/attendance?${params.toString()}`, { cache: "no-store" });
+    if (!res.ok) return [];
     const data = await res.json();
     return data.records || [];
   } catch (err) {

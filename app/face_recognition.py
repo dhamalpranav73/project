@@ -93,7 +93,28 @@ def _prepare_image_input(img_input):
 
 
 # Load Haar Cascade detector for rapid (<5ms) human face presence detection
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+# Check bundled cascade file first, then system opencv data directory
+face_cascade = None
+_bundled_cascade = Path(__file__).resolve().parent / "haarcascade_frontalface_default.xml"
+
+try:
+    if _bundled_cascade.exists():
+        face_cascade = cv2.CascadeClassifier(str(_bundled_cascade))
+        if face_cascade.empty():
+            face_cascade = None
+except Exception as _e:
+    face_cascade = None
+
+if face_cascade is None:
+    try:
+        if hasattr(cv2, "data") and hasattr(cv2.data, "haarcascades"):
+            _sys_cascade = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            if Path(_sys_cascade).exists():
+                face_cascade = cv2.CascadeClassifier(_sys_cascade)
+                if face_cascade.empty():
+                    face_cascade = None
+    except Exception as _e:
+        face_cascade = None
 
 
 def detect_faces_in_image(image_input):
@@ -101,36 +122,49 @@ def detect_faces_in_image(image_input):
     Rapid (3-5ms) OpenCV Haar-Cascade detector to check if a human face is present.
     Returns: (has_face: bool, face_boxes: list of dict(x, y, w, h))
     """
-    img = _prepare_image_input(image_input)
-    if img is None:
+    try:
+        img = _prepare_image_input(image_input)
+        if img is None:
+            return False, []
+
+        # If cascade classifier is unavailable, assume human face could be present
+        # so subsequent verification can proceed without blocking attendance
+        if face_cascade is None or face_cascade.empty():
+            return True, []
+
+        h, w = img.shape[:2]
+        if h == 0 or w == 0:
+            return False, []
+
+        # Resize down to max 320px width for near-instant 3ms detection
+        scale = 320.0 / float(max(w, 320))
+        target_w = max(1, int(w * scale))
+        target_h = max(1, int(h * scale))
+        small = cv2.resize(img, (target_w, target_h))
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+
+        faces = face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.15,
+            minNeighbors=3,
+            minSize=(30, 30)
+        )
+
+        boxes = []
+        inv_scale = 1.0 / scale
+        for (x, y, fw, fh) in faces:
+            boxes.append({
+                "x": int(x * inv_scale),
+                "y": int(y * inv_scale),
+                "w": int(fw * inv_scale),
+                "h": int(fh * inv_scale)
+            })
+
+        return len(faces) > 0, boxes
+    except Exception as e:
+        print(f"detect_faces_in_image exception: {e}")
+        # Safe fallback: if detection errored on non-standard frame, don't crash
         return False, []
-
-    h, w = img.shape[:2]
-    # Resize down to max 320px width for near-instant 3ms detection
-    scale = 320.0 / float(max(w, 320))
-    target_w = max(1, int(w * scale))
-    target_h = max(1, int(h * scale))
-    small = cv2.resize(img, (target_w, target_h))
-    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.15,
-        minNeighbors=3,
-        minSize=(30, 30)
-    )
-
-    boxes = []
-    inv_scale = 1.0 / scale
-    for (x, y, fw, fh) in faces:
-        boxes.append({
-            "x": int(x * inv_scale),
-            "y": int(y * inv_scale),
-            "w": int(fw * inv_scale),
-            "h": int(fh * inv_scale)
-        })
-
-    return len(faces) > 0, boxes
 
 
 def verify_faces(img1_input, img2_input, model_name="Facenet", custom_threshold=None):

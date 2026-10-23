@@ -226,6 +226,30 @@ export default function MarkAttendancePage() {
     isWithinGeofence = distanceToCampus <= campusConfig.radius_meters;
   }
 
+  // Safe response parser that avoids "Unexpected token '<'" on server errors
+  const safeParseResponse = async (res: Response) => {
+    try {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        return await res.json();
+      }
+      const rawText = await res.text();
+      return {
+        success: false,
+        face_detected: false,
+        matched: false,
+        message: `Server status ${res.status}: ${res.statusText || "Communication issue with AI service."}`
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        face_detected: false,
+        matched: false,
+        message: `Unable to read server response: ${e.message}`
+      };
+    }
+  };
+
   // ==========================================
   // AUTOMATIC FRAME SCANNER & ATTENDANCE MARK
   // ==========================================
@@ -293,7 +317,7 @@ export default function MarkAttendancePage() {
         })
       });
 
-      const data = await res.json();
+      const data = await safeParseResponse(res);
 
       // If geofence failed on backend
       if (data.geofence_passed === false || res.status === 403) {
@@ -386,7 +410,7 @@ export default function MarkAttendancePage() {
             longitude: userLocation?.lon ?? null
           })
         });
-        const data = await res.json();
+        const data = await safeParseResponse(res);
 
       // If geofence failed on backend
       if (data.geofence_passed === false || res.status === 403) {
@@ -428,7 +452,7 @@ export default function MarkAttendancePage() {
             longitude: userLocation?.lon ?? null
           })
         });
-        const matchData = await matchRes.json();
+        const matchData = await safeParseResponse(matchRes);
         setResult(matchData);
         if (matchData.matched && matchData.success) playSuccessChime();
       } else {

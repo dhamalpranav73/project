@@ -334,6 +334,32 @@ def api_get_attendance():
     return jsonify({"success": True, "count": len(records), "records": records}), 200
 
 
+@app.errorhandler(500)
+def handle_500_error(e):
+    """Ensures all 500 errors return JSON, avoiding unexpected token '<' errors on client."""
+    import traceback
+    return jsonify({
+        "success": False,
+        "matched": False,
+        "face_detected": False,
+        "message": f"Internal server error: {str(e)}",
+        "detail": traceback.format_exc()
+    }), 500
+
+
+@app.errorhandler(Exception)
+def handle_general_exception(e):
+    """Catches all unhandled exceptions and returns structured JSON."""
+    import traceback
+    return jsonify({
+        "success": False,
+        "matched": False,
+        "face_detected": False,
+        "message": f"Server exception: {str(e)}",
+        "detail": traceback.format_exc()
+    }), 500
+
+
 @app.route("/api/attendance/mark", methods=["POST"])
 def api_mark_attendance_face():
     """
@@ -342,123 +368,137 @@ def api_mark_attendance_face():
     2. Matches live face with database Base64 photo using DeepFace.
     3. Records attendance in database with distance audit log.
     """
-    data = request.get_json(silent=True) or {}
-    live_image_b64 = data.get("image_base64", "").strip()
-    specific_roll = data.get("roll_number", "").strip().upper()
-    student_lat = data.get("latitude")
-    student_lon = data.get("longitude")
+    try:
+        data = request.get_json(silent=True) or {}
+        live_image_b64 = data.get("image_base64", "").strip()
+        specific_roll = data.get("roll_number", "").strip().upper()
+        student_lat = data.get("latitude")
+        student_lon = data.get("longitude")
 
-    if not live_image_b64:
-        return jsonify({
-            "success": False,
-            "matched": False,
-            "message": "No live camera photo received. Please look at the camera and capture frame."
-        }), 400
-
-    # ==========================================
-    # GEOFENCE CHECK (Must be within 100m)
-    # ==========================================
-    campus = get_campus_location()
-    distance_from_campus = None
-
-    if campus.get("enabled", True):
-        allowed_radius = float(campus.get("radius_meters", 100.0))
-
-        if student_lat is None or student_lon is None:
+        if not live_image_b64:
             return jsonify({
                 "success": False,
                 "matched": False,
-                "geofence_passed": False,
-                "message": "GPS location is required. You must enable location access to verify you are within 100m of the campus."
+                "message": "No live camera photo received. Please look at the camera and capture frame."
+            }), 400
+
+        # ==========================================
+        # GEOFENCE CHECK (Must be within 100m)
+        # ==========================================
+        campus = get_campus_location()
+        distance_from_campus = None
+
+        if campus and campus.get("enabled", True):
+            allowed_radius = float(campus.get("radius_meters", 100.0))
+
+            if student_lat is None or student_lon is None:
+                return jsonify({
+                    "success": False,
+                    "matched": False,
+                    "geofence_passed": False,
+                    "message": "GPS location is required. You must enable location access to verify you are within 100m of the campus."
+                }), 200
+
+            distance_from_campus = calculate_haversine_distance(
+                student_lat, student_lon,
+                campus["latitude"], campus["longitude"]
+            )
+
+            if distance_from_campus > allowed_radius:
+                return jsonify({
+                    "success": False,
+                    "matched": False,
+                    "geofence_passed": False,
+                    "distance_meters": distance_from_campus,
+                    "allowed_radius": allowed_radius,
+                    "message": f"Geofence Restriction: You are {int(distance_from_campus)}m away from the campus/classroom. Attendance can only be marked within {int(allowed_radius)}m."
+                }), 200
+
+        students = get_all_students()
+        if not students:
+            return jsonify({
+                "success": False,
+                "matched": False,
+                "message": "No registered students found in database. Please register students first."
+            }), 400
+
+        # ==========================================
+        # RAPID HUMAN FACE PRESENCE CHECK (OpenCV Haar 3ms)
+        # ==========================================
+        has_face, face_boxes = detect_faces_in_image(live_image_b64)
+        if not has_face:
+            return jsonify({
+                "success": False,
+                "face_detected": False,
+                "matched": False,
+                "geofence_passed": True,
+                "distance_from_campus": distance_from_campus,
+                "message": "Looking for human face in camera..."
             }), 200
 
-        distance_from_campus = calculate_haversine_distance(
-            student_lat, student_lon,
-            campus["latitude"], campus["longitude"]
+        app_settings = get_app_settings()
+
+        # Match using open-source DeepFace Facenet with configured threshold
+        matched_student, distance, err = find_matching_student(
+            live_image_input=live_image_b64,
+            students_list=students,
+            specific_roll=specific_roll if specific_roll else None,
+            threshold=app_settings.get("match_threshold", 0.40)
         )
 
-        if distance_from_campus > allowed_radius:
+        if not matched_student:
             return jsonify({
                 "success": False,
+                "face_detected": True,
                 "matched": False,
-                "geofence_passed": False,
-                "distance_meters": distance_from_campus,
-                "allowed_radius": allowed_radius,
-                "message": f"Geofence Restriction: You are {int(distance_from_campus)}m away from the campus/classroom. Attendance can only be marked within {int(allowed_radius)}m."
+                "geofence_passed": True,
+                "distance_from_campus": distance_from_campus,
+                "face_boxes": face_boxes,
+                "message": err or "Face detected, but did not match any registered student in database."
             }), 200
 
-    students = get_all_students()
-    if not students:
-        return jsonify({
-            "success": False,
-            "matched": False,
-            "message": "No registered students found in database. Please register students first."
-        }), 400
+        # Mark attendance in database with GPS metadata
+        success, msg, record = mark_student_attendance(
+            roll_number=matched_student["roll_number"],
+            name=matched_student["name"],
+            class_name=matched_student.get("class_name", ""),
+            confidence=distance,
+            verification_method="AI Face Auto-Scan",
+            latitude=student_lat,
+            longitude=student_lon,
+            distance_from_campus=distance_from_campus
+        )
 
-    # ==========================================
-    # RAPID HUMAN FACE PRESENCE CHECK (OpenCV Haar 3ms)
-    # ==========================================
-    has_face, face_boxes = detect_faces_in_image(live_image_b64)
-    if not has_face:
+        return jsonify({
+            "success": success,
+            "face_detected": True,
+            "matched": True,
+            "geofence_passed": True,
+            "message": msg,
+            "student": {
+                "roll_number": matched_student["roll_number"],
+                "name": matched_student["name"],
+                "class_name": matched_student.get("class_name", ""),
+                "image_base64": matched_student.get("image_base64", "")
+            },
+            "distance": round(distance, 4) if distance is not None else None,
+            "distance_from_campus": distance_from_campus,
+            "face_boxes": face_boxes,
+            "record": record
+        }), 200
+
+    except Exception as e:
+        import traceback
+        trace = traceback.format_exc()
+        app.logger.error(f"Error in api_mark_attendance_face: {trace}")
         return jsonify({
             "success": False,
             "face_detected": False,
             "matched": False,
-            "geofence_passed": True,
-            "distance_from_campus": distance_from_campus,
-            "message": "Looking for human face in camera..."
+            "message": f"Face recognition error: {str(e)}",
+            "error": str(e),
+            "traceback": trace
         }), 200
-
-    app_settings = get_app_settings()
-
-    # Match using open-source DeepFace Facenet with configured threshold
-    matched_student, distance, err = find_matching_student(
-        live_image_input=live_image_b64,
-        students_list=students,
-        specific_roll=specific_roll if specific_roll else None,
-        threshold=app_settings.get("match_threshold", 0.40)
-    )
-
-    if not matched_student:
-        return jsonify({
-            "success": False,
-            "face_detected": True,
-            "matched": False,
-            "geofence_passed": True,
-            "distance_from_campus": distance_from_campus,
-            "face_boxes": face_boxes,
-            "message": err or "Face detected, but did not match any registered student in database."
-        }), 200
-
-    # Mark attendance in database with GPS metadata
-    success, msg, record = mark_student_attendance(
-        roll_number=matched_student["roll_number"],
-        name=matched_student["name"],
-        class_name=matched_student.get("class_name", ""),
-        confidence=distance,
-        verification_method="AI Face Auto-Scan",
-        latitude=student_lat,
-        longitude=student_lon,
-        distance_from_campus=distance_from_campus
-    )
-
-    return jsonify({
-        "success": success,
-        "face_detected": True,
-        "matched": True,
-        "geofence_passed": True,
-        "message": msg,
-        "student": {
-            "roll_number": matched_student["roll_number"],
-            "name": matched_student["name"],
-            "class_name": matched_student.get("class_name", ""),
-            "image_base64": matched_student.get("image_base64", "")
-        },
-        "distance": round(distance, 4) if distance is not None else None,
-        "distance_from_campus": distance_from_campus,
-        "face_boxes": face_boxes,
-        "record": record
-    }), 200
 
 
 @app.route("/api/attendance/manual", methods=["POST"])

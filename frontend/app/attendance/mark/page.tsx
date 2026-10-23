@@ -346,6 +346,7 @@ export default function MarkAttendancePage() {
         } else {
           // Face detected but not matched to registered student
           setScanStatus("Human face detected • Student not matched in database");
+          setCooldown(2); // Short 2-second pause to prevent hammering server on unmatched faces
           if (isManual) setResult(data);
         }
       } else {
@@ -590,14 +591,16 @@ export default function MarkAttendancePage() {
                 <RefreshCw className="w-3.5 h-3.5" />
                 Retry Camera
               </button>
-              <button
-                type="button"
-                onClick={triggerOpenCVCamera}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <Cpu className="w-3.5 h-3.5" />
-                Use OpenCV Camera
-              </button>
+              {typeof window !== "undefined" && (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) && (
+                <button
+                  type="button"
+                  onClick={triggerOpenCVCamera}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  <Cpu className="w-3.5 h-3.5" />
+                  Use OpenCV Camera
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -732,15 +735,17 @@ export default function MarkAttendancePage() {
         {/* Controls Bar */}
         <div className="p-4 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <button
-              onClick={triggerOpenCVCamera}
-              disabled={loading}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border border-slate-700 cursor-pointer"
-              title="Capture from desktop OpenCV camera"
-            >
-              <Cpu className="w-3.5 h-3.5 text-slate-400" />
-              OpenCV Cam
-            </button>
+            {typeof window !== "undefined" && (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) && (
+              <button
+                onClick={triggerOpenCVCamera}
+                disabled={loading}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border border-slate-700 cursor-pointer"
+                title="Capture from desktop OpenCV camera"
+              >
+                <Cpu className="w-3.5 h-3.5 text-slate-400" />
+                OpenCV Cam
+              </button>
+            )}
 
             <button
               onClick={() => fileInputRef.current?.click()}

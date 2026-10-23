@@ -7,12 +7,19 @@ import time
 import json
 import base64
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import certifi
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
 from werkzeug.security import generate_password_hash, check_password_hash
+
+# Indian Standard Time (UTC+05:30)
+IST_TIMEZONE = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    """Returns current datetime in Indian Standard Time (IST, UTC+05:30)."""
+    return datetime.now(IST_TIMEZONE)
 
 # Find the main project folder
 PROJECT_FOLDER = Path(__file__).resolve().parent.parent
@@ -249,13 +256,13 @@ def get_campus_location():
         "longitude": 73.8567,
         "radius_meters": 100.0,
         "enabled": True,
-        "updated_at": datetime.now().isoformat()
+        "updated_at": get_ist_now().isoformat()
     }
 
 
 def update_campus_location(latitude, longitude, radius_meters=100.0, name="College Campus / Classroom", enabled=True):
     """Updates campus geofence coordinates and allowed radius."""
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
     loc_data = {
         "name": name,
         "latitude": float(latitude),
@@ -355,7 +362,7 @@ def verify_admin_credentials(username, password):
         return None, "Invalid username or password."
 
     # Update last login
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("UPDATE admin_users SET last_login = ? WHERE id = ?", (now_str, admin_id))
     conn.commit()
     conn.close()
@@ -424,14 +431,14 @@ def get_app_settings():
         "late_cutoff_time": "09:30",
         "prevent_duplicate": True,
         "allow_manual_entry": True,
-        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "updated_at": get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 
 def update_app_settings(data):
     """Updates application configuration settings and syncs campus_location."""
     current = get_app_settings()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
 
     campus_name = data.get("campus_name", current["campus_name"])
     latitude = float(data.get("latitude", current["latitude"]))
@@ -502,7 +509,7 @@ def clear_all_attendance_records():
 def get_system_backup():
     """Exports full database dump (students, attendance, settings)."""
     return {
-        "exported_at": datetime.now().isoformat(),
+        "exported_at": get_ist_now().isoformat(),
         "settings": get_app_settings(),
         "students": get_all_students(),
         "attendance": get_all_attendance()
@@ -549,7 +556,7 @@ def save_student(roll_number, name, class_name, image_base64=None, email=""):
     name = name.strip()
     class_name = class_name.strip()
     email = (email or "").strip().lower()
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
 
     if is_mongo_available() and students_collection is not None:
         try:
@@ -623,8 +630,12 @@ def get_student(roll_number):
     return None
 
 
-def get_all_students(search=None, class_filter=None):
+def get_all_students(search=None, class_filter=None, include_images=True):
     """Fetches all registered students with optional search and class filtering."""
+    projection = {"_id": 0}
+    if not include_images:
+        projection["image_base64"] = 0
+
     if is_mongo_available() and students_collection is not None:
         try:
             query = {}
@@ -635,16 +646,16 @@ def get_all_students(search=None, class_filter=None):
                     {"name": {"$regex": search, "$options": "i"}},
                     {"roll_number": {"$regex": search, "$options": "i"}}
                 ]
-            students = list(students_collection.find(query, {"_id": 0}))
-            if students:
-                return students
+            students = list(students_collection.find(query, projection))
+            return students
         except PyMongoError:
             pass
 
     conn = sqlite3.connect(str(LOCAL_DB_PATH))
     cursor = conn.cursor()
     
-    query = "SELECT roll_number, name, class_name, email, image_base64, status, registered_at FROM students WHERE 1=1"
+    img_col = "image_base64" if include_images else "'' AS image_base64"
+    query = f"SELECT roll_number, name, class_name, email, {img_col}, status, registered_at FROM students WHERE 1=1"
     params = []
 
     if class_filter:
@@ -701,10 +712,11 @@ def mark_student_attendance(roll_number, name, class_name, confidence=None, veri
     Prevents duplicate entries on the same date.
     """
     roll_number = roll_number.strip().upper()
-    now = datetime.now()
+    now = get_ist_now()
     today_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%I:%M:%S %p")
     now_iso = now.isoformat()
+    rec_id = int(time.time() * 1000) % 2147483647
 
     settings = get_app_settings()
 
@@ -714,7 +726,7 @@ def mark_student_attendance(roll_number, name, class_name, confidence=None, veri
         if existing:
             return False, f"Attendance already marked for today at {existing.get('time')}", existing
 
-    # Determine status based on late cutoff time setting
+    # Determine status based on late cutoff time setting (IST)
     status = "Present"
     late_cutoff = settings.get("late_cutoff_time", "09:30")
     try:
@@ -725,6 +737,7 @@ def mark_student_attendance(roll_number, name, class_name, confidence=None, veri
         status = "Present"
 
     record = {
+        "id": rec_id,
         "roll_number": roll_number,
         "name": name,
         "class_name": class_name,
@@ -748,11 +761,11 @@ def mark_student_attendance(roll_number, name, class_name, confidence=None, veri
     conn = sqlite3.connect(str(LOCAL_DB_PATH))
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO attendance (roll_number, name, class_name, date, time, status, confidence, verification_method, latitude, longitude, distance_from_campus, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO attendance (id, roll_number, name, class_name, date, time, status, confidence, verification_method, latitude, longitude, distance_from_campus, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(roll_number, date) DO NOTHING
     """, (
-        roll_number, name, class_name, today_str, time_str, status, 
+        rec_id, roll_number, name, class_name, today_str, time_str, status, 
         confidence, verification_method, 
         latitude, longitude, distance_from_campus, now_iso
     ))
@@ -772,12 +785,14 @@ def record_manual_attendance(roll_number, status="Present", date_str=None, time_
     if not student:
         return False, "Student not found in database.", None
 
-    now = datetime.now()
+    now = get_ist_now()
     date_val = date_str or now.strftime("%Y-%m-%d")
     time_val = time_str or now.strftime("%I:%M:%S %p")
     now_iso = now.isoformat()
+    rec_id = int(time.time() * 1000) % 2147483647
 
     record = {
+        "id": rec_id,
         "roll_number": student["roll_number"],
         "name": student["name"],
         "class_name": student["class_name"],
@@ -802,14 +817,14 @@ def record_manual_attendance(roll_number, status="Present", date_str=None, time_
     conn = sqlite3.connect(str(LOCAL_DB_PATH))
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO attendance (roll_number, name, class_name, date, time, status, confidence, verification_method, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO attendance (id, roll_number, name, class_name, date, time, status, confidence, verification_method, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(roll_number, date) DO UPDATE SET
             status = excluded.status,
             time = excluded.time,
             verification_method = excluded.verification_method,
             timestamp = excluded.timestamp
-    """, (student["roll_number"], student["name"], student["class_name"], date_val, time_val, status, None, "Manual Admin Entry", now_iso))
+    """, (rec_id, student["roll_number"], student["name"], student["class_name"], date_val, time_val, status, None, "Manual Admin Entry", now_iso))
     conn.commit()
     conn.close()
 
@@ -819,7 +834,7 @@ def record_manual_attendance(roll_number, status="Present", date_str=None, time_
 def get_attendance_for_student_today(roll_number, today_str=None):
     """Finds today's attendance record for a student."""
     if today_str is None:
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = get_ist_now().strftime("%Y-%m-%d")
 
     if is_mongo_available() and attendance_collection is not None:
         try:
@@ -871,9 +886,16 @@ def get_all_attendance(date_filter=None, roll_filter=None, class_filter=None):
                 query["roll_number"] = roll_filter.strip().upper()
             if class_filter:
                 query["class_name"] = class_filter
-            records = list(attendance_collection.find(query, {"_id": 0}).sort("timestamp", -1))
-            if records:
-                return records
+            docs = list(attendance_collection.find(query).sort("timestamp", -1))
+            records = []
+            for d in docs:
+                rec_id = d.get("id")
+                if rec_id is None and "_id" in d:
+                    rec_id = str(d["_id"])
+                d["id"] = rec_id
+                d.pop("_id", None)
+                records.append(d)
+            return records
         except PyMongoError:
             pass
 
@@ -923,26 +945,42 @@ def get_all_attendance(date_filter=None, roll_filter=None, class_filter=None):
 
 
 def delete_attendance_record(record_id):
-    """Deletes an attendance entry by ID."""
+    """Deletes an attendance entry by ID from both MongoDB and SQLite."""
+    deleted_mongo = False
+    if is_mongo_available() and attendance_collection is not None:
+        try:
+            from bson import ObjectId
+            filters = [{"id": record_id}]
+            if str(record_id).isdigit():
+                filters.append({"id": int(record_id)})
+            try:
+                filters.append({"_id": ObjectId(str(record_id))})
+            except Exception:
+                pass
+            res = attendance_collection.delete_one({"$or": filters})
+            deleted_mongo = res.deleted_count > 0
+        except Exception as e:
+            print(f"MongoDB delete attendance failed: {e}")
+
     conn = sqlite3.connect(str(LOCAL_DB_PATH))
     cursor = conn.cursor()
     cursor.execute("DELETE FROM attendance WHERE id = ?", (record_id,))
-    deleted = cursor.rowcount > 0
+    deleted_sqlite = cursor.rowcount > 0
     conn.commit()
     conn.close()
-    return deleted
+    return deleted_mongo or deleted_sqlite
 
 
 def get_dashboard_analytics():
     """Calculates comprehensive dashboard analytics, 7-day trend, and campus geofence info."""
-    today = datetime.now()
+    today = get_ist_now()
     today_str = today.strftime("%Y-%m-%d")
 
-    all_students = get_all_students()
+    all_students = get_all_students(include_images=False)
     total_students = len(all_students)
 
     today_records = get_all_attendance(date_filter=today_str)
-    present_today = len(set(r["roll_number"] for r in today_records if r.get("status") == "Present"))
+    present_today = len(set(r["roll_number"] for r in today_records if r.get("status") in ("Present", "Late")))
     absent_today = max(0, total_students - present_today)
 
     rate = 0.0
@@ -955,7 +993,7 @@ def get_dashboard_analytics():
         day_str = day_date.strftime("%Y-%m-%d")
         day_label = day_date.strftime("%a (%d %b)")
         day_records = get_all_attendance(date_filter=day_str)
-        p_count = len(set(r["roll_number"] for r in day_records if r.get("status") == "Present"))
+        p_count = len(set(r["roll_number"] for r in day_records if r.get("status") in ("Present", "Late")))
         trend.append({
             "date": day_str,
             "day": day_label,

@@ -14,7 +14,7 @@ import {
   RefreshCw,
   Filter
 } from "lucide-react";
-import { fetchStudents, Student, API_BASE } from "@/lib/api";
+import { fetchStudents, Student, deleteStudent, getAdminToken, API_BASE } from "@/lib/api";
 
 export default function StudentsDirectoryPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -38,15 +38,22 @@ export default function StudentsDirectoryPage() {
   }, [search, classFilter]);
 
   const handleDelete = async (roll: string, name: string) => {
+    const token = getAdminToken();
+    if (!token) {
+      alert("Administrator login is required to delete students. Please log in first.");
+      window.location.href = "/login";
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete student ${name} (${roll}) from the database?`)) return;
 
     setDeletingRoll(roll);
     try {
-      const res = await fetch(`${API_BASE}/api/students/${roll}`, { method: "DELETE" });
-      if (res.ok) {
+      const res = await deleteStudent(roll, token);
+      if (res.success) {
         setStudents((prev) => prev.filter((s) => s.roll_number !== roll));
       } else {
-        alert("Failed to delete student");
+        alert(res.message || "Failed to delete student");
       }
     } catch (err: any) {
       alert("Error: " + err.message);

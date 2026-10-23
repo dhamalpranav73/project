@@ -198,9 +198,13 @@ def api_get_db_status():
 def api_location_config():
     """
     GET: Returns current college campus coordinates and allowed radius (100m).
-    POST: Updates campus location or calibrates to current admin GPS location.
+    POST: Updates campus location or calibrates to current admin GPS location (Requires Admin Auth).
     """
     if request.method == "POST":
+        payload, err = check_auth_header()
+        if not payload:
+            return jsonify({"success": False, "message": f"Admin authentication required: {err}"}), 401
+
         data = request.get_json(silent=True) or {}
         lat = data.get("latitude")
         lon = data.get("longitude")
@@ -249,7 +253,7 @@ def api_get_student_detail(roll_number):
 
 @app.route("/api/students", methods=["POST"])
 def api_register_student():
-    """Registers or updates a student in the database."""
+    """Registers a student in the database. Prevents accidental overwrite of existing students."""
     data = request.get_json(silent=True) or request.form
     roll_number = data.get("roll_number", "").strip().upper()
     name = data.get("name", "").strip()
@@ -262,6 +266,16 @@ def api_register_student():
 
     if not image_base64:
         return jsonify({"success": False, "message": "Face photo is required for facial recognition."}), 400
+
+    # Check for duplicate registration
+    existing = get_student(roll_number)
+    if existing:
+        payload, _ = check_auth_header()
+        if not payload:
+            return jsonify({
+                "success": False,
+                "message": f"Roll number '{roll_number}' is already registered to '{existing['name']}'. To update their profile, please log in as an administrator."
+            }), 409
 
     try:
         optimized_b64 = optimize_base64_image(image_base64, max_dimension=640, quality=85)
@@ -285,7 +299,11 @@ def api_register_student():
 
 @app.route("/api/students/<roll_number>", methods=["PUT"])
 def api_update_student(roll_number):
-    """Updates student information or updates their reference Base64 facial photo."""
+    """Updates student information or updates their reference Base64 facial photo (Requires Admin Auth)."""
+    payload, err = check_auth_header()
+    if not payload:
+        return jsonify({"success": False, "message": f"Admin authentication required: {err}"}), 401
+
     student = get_student(roll_number)
     if not student:
         return jsonify({"success": False, "message": "Student not found"}), 404
@@ -314,7 +332,11 @@ def api_update_student(roll_number):
 
 @app.route("/api/students/<roll_number>", methods=["DELETE"])
 def api_delete_student(roll_number):
-    """Deletes student from database."""
+    """Deletes student from database (Requires Admin Auth)."""
+    payload, err = check_auth_header()
+    if not payload:
+        return jsonify({"success": False, "message": f"Admin authentication required: {err}"}), 401
+
     success = delete_student(roll_number)
     return jsonify({"success": success, "message": f"Student {roll_number} deleted successfully."}), 200
 
@@ -503,7 +525,11 @@ def api_mark_attendance_face():
 
 @app.route("/api/attendance/manual", methods=["POST"])
 def api_mark_attendance_manual():
-    """Manual attendance recording / admin override."""
+    """Manual attendance recording / admin override (Requires Admin Auth)."""
+    payload, err = check_auth_header()
+    if not payload:
+        return jsonify({"success": False, "message": f"Admin authentication required: {err}"}), 401
+
     data = request.get_json(silent=True) or {}
     roll = data.get("roll_number", "").strip().upper()
     status = data.get("status", "Present").strip()
@@ -518,9 +544,13 @@ def api_mark_attendance_manual():
     return jsonify({"success": True, "message": msg, "record": record}), 200
 
 
-@app.route("/api/attendance/<int:record_id>", methods=["DELETE"])
+@app.route("/api/attendance/<record_id>", methods=["DELETE"])
 def api_delete_attendance(record_id):
-    """Deletes an attendance record."""
+    """Deletes an attendance record (Requires Admin Auth)."""
+    payload, err = check_auth_header()
+    if not payload:
+        return jsonify({"success": False, "message": f"Admin authentication required: {err}"}), 401
+
     deleted = delete_attendance_record(record_id)
     return jsonify({"success": deleted, "message": "Attendance record deleted." if deleted else "Record not found."}), 200
 

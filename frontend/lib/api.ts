@@ -98,12 +98,18 @@ export async function updateCampusLocation(
   longitude: number,
   radius_meters = 100.0,
   name = "College Campus / Classroom",
-  enabled = true
+  enabled = true,
+  token?: string
 ): Promise<CampusLocation | null> {
   try {
+    const adminToken = token || getAdminToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (adminToken) {
+      headers["Authorization"] = `Bearer ${adminToken}`;
+    }
     const res = await fetch(`${API_BASE}/api/location/config`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ latitude, longitude, radius_meters, name, enabled })
     });
     if (!res.ok) return null;
@@ -296,5 +302,62 @@ export async function fetchSystemBackup(token: string): Promise<any> {
   } catch (err: any) {
     console.error("Backup failed:", err);
     return null;
+  }
+}
+
+export async function deleteStudent(roll: string, token?: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const adminToken = token || getAdminToken();
+    const headers: Record<string, string> = {};
+    if (adminToken) {
+      headers["Authorization"] = `Bearer ${adminToken}`;
+    }
+    const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(roll)}`, {
+      method: "DELETE",
+      headers
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function deleteAttendanceRecord(id: string | number, token?: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const adminToken = token || getAdminToken();
+    const headers: Record<string, string> = {};
+    if (adminToken) {
+      headers["Authorization"] = `Bearer ${adminToken}`;
+    }
+    const res = await fetch(`${API_BASE}/api/attendance/${id}`, {
+      method: "DELETE",
+      headers
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+}
+
+export async function submitManualAttendance(
+  rollNumber: string,
+  status = "Present",
+  date?: string,
+  token?: string
+): Promise<{ success: boolean; message: string; record?: any }> {
+  try {
+    const adminToken = token || getAdminToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (adminToken) {
+      headers["Authorization"] = `Bearer ${adminToken}`;
+    }
+    const res = await fetch(`${API_BASE}/api/attendance/manual`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ roll_number: rollNumber, status, date: date || "" })
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { success: false, message: err.message };
   }
 }

@@ -16,7 +16,14 @@ import {
   Camera,
   MapPin
 } from "lucide-react";
-import { fetchAttendance, AttendanceRecord, API_BASE } from "@/lib/api";
+import { 
+  fetchAttendance, 
+  AttendanceRecord, 
+  deleteAttendanceRecord, 
+  submitManualAttendance, 
+  getAdminToken, 
+  API_BASE 
+} from "@/lib/api";
 
 export default function AttendanceLogsPage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -72,14 +79,23 @@ export default function AttendanceLogsPage() {
   };
 
   // Delete attendance record
-  const handleDelete = async (id: number | undefined) => {
-    if (!id) return;
+  const handleDelete = async (id: number | string | undefined) => {
+    if (id === undefined || id === null) return;
+    const token = getAdminToken();
+    if (!token) {
+      alert("Administrator login is required to delete attendance records. Please log in first.");
+      window.location.href = "/login";
+      return;
+    }
+
     if (!confirm("Are you sure you want to remove this attendance record?")) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/attendance/${id}`, { method: "DELETE" });
-      if (res.ok) {
+      const res = await deleteAttendanceRecord(id, token);
+      if (res.success) {
         setRecords((prev) => prev.filter((r) => r.id !== id));
+      } else {
+        alert(res.message || "Failed to delete record.");
       }
     } catch (err: any) {
       alert("Failed to delete record: " + err.message);
@@ -91,24 +107,27 @@ export default function AttendanceLogsPage() {
     e.preventDefault();
     if (!manualRoll.trim()) return;
 
+    const token = getAdminToken();
+    if (!token) {
+      alert("Administrator login is required to record manual attendance. Please log in first.");
+      window.location.href = "/login";
+      return;
+    }
+
     setManualSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/attendance/manual`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roll_number: manualRoll.trim().toUpperCase(),
-          status: manualStatus,
-          date: dateFilter || undefined
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
+      const res = await submitManualAttendance(
+        manualRoll.trim().toUpperCase(),
+        manualStatus,
+        dateFilter || undefined,
+        token
+      );
+      if (res.success) {
         setManualModalOpen(false);
         setManualRoll("");
         loadAttendance();
       } else {
-        alert(data.message || "Failed to record manual attendance.");
+        alert(res.message || "Failed to record manual attendance.");
       }
     } catch (err: any) {
       alert("Error: " + err.message);
@@ -279,7 +298,7 @@ export default function AttendanceLogsPage() {
                     </td>
 
                     <td className="py-3 px-4 text-right">
-                      {r.id && (
+                      {r.id !== undefined && r.id !== null && (
                         <button
                           onClick={() => handleDelete(r.id)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition"

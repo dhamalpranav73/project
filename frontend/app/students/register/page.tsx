@@ -263,14 +263,16 @@ export default function RegisterStudentPage() {
                 <RefreshCw className="w-3.5 h-3.5" />
                 Retry Camera
               </button>
-              <button
-                type="button"
-                onClick={captureViaOpenCV}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
-              >
-                <Cpu className="w-3.5 h-3.5" />
-                Use OpenCV Camera
-              </button>
+              {typeof window !== "undefined" && (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) && (
+                <button
+                  type="button"
+                  onClick={captureViaOpenCV}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                >
+                  <Cpu className="w-3.5 h-3.5" />
+                  Use OpenCV Camera
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -444,15 +446,17 @@ export default function RegisterStudentPage() {
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={captureViaOpenCV}
-                  className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
-                  title="Capture frame using OpenCV backend camera"
-                >
-                  <Cpu className="w-3.5 h-3.5 text-slate-400" />
-                  OpenCV Cam
-                </button>
+                {typeof window !== "undefined" && (API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) && (
+                  <button
+                    type="button"
+                    onClick={captureViaOpenCV}
+                    className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                    title="Capture frame using OpenCV backend camera"
+                  >
+                    <Cpu className="w-3.5 h-3.5 text-slate-400" />
+                    OpenCV Cam
+                  </button>
+                )}
 
                 <label className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold shadow-2xs transition cursor-pointer flex items-center gap-1.5">
                   <Upload className="w-3.5 h-3.5 text-slate-500" />
